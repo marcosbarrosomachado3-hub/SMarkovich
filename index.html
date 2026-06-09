@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulador Markovich de Renda Fixa</title>
-    <!-- CDN alternativo e estável da Cloudflare para o gráfico -->
-    <script src="https://cloudflare.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
         :root {
-            --bg-principal: #1c1921; /* Roxo bem escuro / Grafite Rico */
-            --bg-card: #25222b;      /* Roxo secundário */
-            --cor-laranja: #ff5a00;  /* Laranja destaque Rico */
+            --bg-principal: #1c1921;
+            --bg-card: #25222b;
+            --cor-laranja: #ff5a00;
             --cor-texto: #ffffff;
             --cor-mutada: #a3a0a8;
             --borda: #332f3b;
             --abas-bg: #2d2935;
+            --cor-verde: #34d399;
+            --cor-vermelha: #f87171;
         }
 
         * {
@@ -29,99 +30,94 @@
             color: var(--cor-texto);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
-            padding: 20px;
+            padding: 30px 20px;
         }
 
         .container {
             background-color: var(--bg-card);
             border-radius: 16px;
-            padding: 25px;
+            padding: 30px 25px;
             width: 100%;
-            max-width: 900px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 960px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
             border: 1px solid var(--borda);
         }
 
         h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-size: 22px;
+            margin-bottom: 22px;
             text-align: center;
+            letter-spacing: 0.3px;
         }
 
-        h1 span {
-            color: var(--cor-laranja);
-        }
+        h1 span { color: var(--cor-laranja); }
 
-        /* Sistema de Abas */
+        /* Abas */
         .tabs {
             display: flex;
             margin-bottom: 25px;
             background-color: var(--abas-bg);
             border-radius: 8px;
             padding: 5px;
+            gap: 4px;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 12px;
+            padding: 11px;
             background: none;
             border: none;
             color: var(--cor-mutada);
-            font-size: 15px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
             border-radius: 6px;
-            transition: all 0.3s;
+            transition: all 0.25s;
         }
 
         .tab-btn.active {
             background-color: var(--cor-laranja);
-            color: var(--cor-texto);
+            color: #fff;
         }
 
-        .tab-content {
-            display: none;
-        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
-        .tab-content.active {
-            display: block;
-        }
-
-        /* Layout em duas colunas */
+        /* Layout */
         .painel-simulador {
             display: grid;
             grid-template-columns: 1fr;
             gap: 25px;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 720px) {
             .painel-simulador {
                 grid-template-columns: 1fr 1fr;
             }
         }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
+        .form-group { margin-bottom: 15px; }
 
         label {
             display: block;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--cor-mutada);
-            margin-bottom: 6px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         input, select {
             width: 100%;
-            padding: 10px;
+            padding: 10px 12px;
             background-color: var(--bg-principal);
             border: 1px solid var(--borda);
             border-radius: 8px;
             color: var(--cor-texto);
             font-size: 15px;
-            transition: border-color 0.3s;
+            transition: border-color 0.2s;
         }
 
         input:focus, select:focus {
@@ -129,55 +125,108 @@
             border-color: var(--cor-laranja);
         }
 
+        select option { background-color: var(--bg-card); }
+
         .btn-simular {
             width: 100%;
-            padding: 12px;
+            padding: 13px;
             background-color: var(--cor-laranja);
             border: none;
             border-radius: 8px;
-            color: var(--cor-texto);
-            font-size: 16px;
-            font-weight: bold;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
+            transition: background 0.2s, transform 0.1s;
+            margin-top: 12px;
+            letter-spacing: 0.4px;
         }
 
-        .btn-simular:hover {
-            background-color: #e04f00;
-        }
+        .btn-simular:hover { background-color: #e04f00; }
+        .btn-simular:active { transform: scale(0.98); }
 
-        /* Resultados e Gráfico */
+        /* Resultados */
         .coluna-resultado {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            gap: 15px;
         }
 
         .resultado-box {
             background-color: var(--bg-principal);
-            border-radius: 8px;
-            padding: 15px;
+            border-radius: 10px;
+            padding: 18px;
             border: 1px solid var(--borda);
-            margin-bottom: 15px;
+        }
+
+        .resultado-box h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--cor-mutada);
+            margin-bottom: 14px;
         }
 
         .res-linha {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
+            align-items: center;
+            margin-bottom: 10px;
             font-size: 14px;
         }
 
-        .res-linha .valor {
-            font-weight: bold;
-            color: var(--cor-laranja);
+        .res-linha:last-child { margin-bottom: 0; }
+
+        .res-linha .label { color: var(--cor-mutada); }
+
+        .res-linha .valor-verde { color: var(--cor-verde); font-weight: 700; }
+        .res-linha .valor-vermelho { color: var(--cor-vermelha); font-weight: 600; }
+        .res-linha .valor-branco { color: #fff; font-weight: 600; }
+        .res-linha .valor-destaque { color: var(--cor-laranja); font-weight: 800; font-size: 17px; }
+
+        .divider {
+            border: none;
+            border-top: 1px dashed var(--borda);
+            margin: 12px 0;
         }
 
+        .badge-isento {
+            display: inline-block;
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--cor-verde);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            border-radius: 4px;
+            font-size: 11px;
+            padding: 2px 7px;
+            font-weight: 600;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        .aliquota-info {
+            font-size: 11px;
+            color: var(--cor-mutada);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Gráfico */
         .chart-container {
             position: relative;
             width: 100%;
-            height: 240px;
+            height: 230px;
+        }
+
+        /* Separador de seção */
+        .secao-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--cor-laranja);
+            margin-bottom: 12px;
+            margin-top: 4px;
+            border-left: 3px solid var(--cor-laranja);
+            padding-left: 8px;
         }
     </style>
 </head>
@@ -186,100 +235,119 @@
 <div class="container">
     <h1>Simulador Markovich de <span>Renda Fixa</span></h1>
 
-    <!-- Alternador de Abas -->
     <div class="tabs">
-        <button class="tab-btn active" id="btn-rf" onclick="mudarAba('renda-fixa')">Renda Fixa</button>
-        <button class="tab-btn" id="btn-rv" onclick="mudarAba('renda-variavel')">Renda Variável (Ações/FIIs)</button>
+        <button class="tab-btn active" id="btn-rf" onclick="mudarAba('renda-fixa')">📊 Renda Fixa</button>
+        <button class="tab-btn" id="btn-rv" onclick="mudarAba('renda-variavel')">📈 Renda Variável (Ações/FIIs)</button>
     </div>
 
     <div class="painel-simulador">
-        
-        <!-- FORMULÁRIOS DE ENTRADA -->
+
+        <!-- ENTRADAS -->
         <div class="coluna-inputs">
-            
+
             <!-- ABA RENDA FIXA -->
             <div id="renda-fixa" class="tab-content active">
+                <p class="secao-label">Produto</p>
                 <div class="form-group">
-                    <label for="rf_produto">Produto de Renda Fixa</label>
-                    <select id="rf_produto">
+                    <label for="rf_produto">Tipo de Investimento</label>
+                    <select id="rf_produto" onchange="calcularTudo()">
                         <option value="cdb">CDB (Pós-Fixado)</option>
                         <option value="lci">LCI / LCA (Isento de IR)</option>
                         <option value="tesouro">Tesouro Selic</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="rf_rentabilidade">% do CDI do Produto</label>
-                    <input type="number" id="rf_rentabilidade" value="100">
+                    <label for="rf_rentabilidade">Rentabilidade (% do CDI)</label>
+                    <input type="number" id="rf_rentabilidade" value="100" min="1" max="200" step="0.5" oninput="calcularTudo()">
                 </div>
                 <div class="form-group">
                     <label for="rf_cdi">Taxa CDI Atual (% ao ano)</label>
-                    <input type="number" id="rf_cdi" value="10.5" step="0.01">
+                    <input type="number" id="rf_cdi" value="10.50" min="0" max="50" step="0.25" oninput="calcularTudo()">
                 </div>
             </div>
 
             <!-- ABA RENDA VARIÁVEL -->
             <div id="renda-variavel" class="tab-content">
+                <p class="secao-label">Ativo</p>
                 <div class="form-group">
-                    <label for="rv_produto">Ativo Alvo</label>
-                    <select id="rv_produto">
+                    <label for="rv_produto">Tipo de Ativo</label>
+                    <select id="rv_produto" onchange="calcularTudo()">
                         <option value="fii">Fundos Imobiliários (FIIs)</option>
                         <option value="acoes">Ações (Dividendos + Crescimento)</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="rv_dividendos">Dividend Yield Esperado (% ao ano)</label>
-                    <input type="number" id="rv_dividendos" value="8.5" step="0.1">
+                    <input type="number" id="rv_dividendos" value="8.5" min="0" max="50" step="0.1" oninput="calcularTudo()">
                 </div>
                 <div class="form-group">
                     <label for="rv_valorizacao">Valorização Média das Cotas (% ao ano)</label>
-                    <input type="number" id="rv_valorizacao" value="4.0" step="0.1">
+                    <input type="number" id="rv_valorizacao" value="4.0" min="-50" max="100" step="0.1" oninput="calcularTudo()">
                 </div>
             </div>
 
             <!-- DADOS COMUNS -->
+            <p class="secao-label">Aportes</p>
             <div class="form-group">
                 <label for="valor_inicial">Aporte Inicial (R$)</label>
-                <input type="number" id="valor_inicial" value="5000">
+                <input type="number" id="valor_inicial" value="5000" min="0" step="100" oninput="calcularTudo()">
             </div>
             <div class="form-group">
                 <label for="aporte_mensal">Aporte Recorrente Mensal (R$)</label>
-                <input type="number" id="aporte_mensal" value="300">
+                <input type="number" id="aporte_mensal" value="300" min="0" step="50" oninput="calcularTudo()">
             </div>
             <div class="form-group">
-                <label for="prazo_meses">Prazo da Projeção (em meses)</label>
-                <input type="number" id="prazo_meses" value="24">
+                <label for="prazo_meses">Prazo da Projeção (meses)</label>
+                <input type="number" id="prazo_meses" value="24" min="1" max="360" step="1" oninput="calcularTudo()">
             </div>
 
-            <button class="btn-simular" onclick="calcularTudo()">Calcular Projeção</button>
+            <button class="btn-simular" onclick="calcularTudo()">🔄 Recalcular Projeção</button>
         </div>
 
-        <!-- EXIBIÇÃO DE RESULTADOS -->
+        <!-- RESULTADOS -->
         <div class="coluna-resultado">
+
             <div class="resultado-box">
+                <h3>Resumo da Projeção</h3>
+
                 <div class="res-linha">
-                    <span>Total Investido:</span>
-                    <span id="res_total_investido" style="color: #fff;">R$ 0,00</span>
+                    <span class="label">Total Investido</span>
+                    <span id="res_total_investido" class="valor-branco">R$ 0,00</span>
                 </div>
                 <div class="res-linha">
-                    <span>Total Rendimentos Bruto:</span>
-                    <span id="res_rendimento_bruto" style="color: #34d399;">R$ 0,00</span>
+                    <span class="label">Rendimento Bruto</span>
+                    <span id="res_rendimento_bruto" class="valor-verde">R$ 0,00</span>
                 </div>
                 <div class="res-linha" id="linha_ir_container">
-                    <span>Imposto de Renda Projetado:</span>
-                    <span id="res_ir" style="color: #f87171;">R$ 0,00</span>
+                    <span class="label">
+                        <span id="label_ir">IR Projetado</span>
+                        <span id="badge_isento" class="badge-isento" style="display:none">Isento</span>
+                    </span>
+                    <span id="res_ir" class="valor-vermelho">R$ 0,00</span>
                 </div>
-                <div class="res-linha" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--borda); font-size: 16px;">
-                    <span><strong>Valor Final Líquido:</strong></span>
-                    <span id="res_final_liquido" class="valor">R$ 0,00</span>
+                <div id="aliquota_texto" class="aliquota-info"></div>
+
+                <hr class="divider">
+
+                <div class="res-linha">
+                    <span style="font-weight:700">Valor Final Líquido</span>
+                    <span id="res_final_liquido" class="valor-destaque">R$ 0,00</span>
+                </div>
+                <div class="res-linha">
+                    <span class="label">Rentabilidade Líquida Total</span>
+                    <span id="res_rentabilidade_pct" class="valor-verde">0,00%</span>
+                </div>
+                <div class="res-linha">
+                    <span class="label">Retorno Mensal Médio</span>
+                    <span id="res_mensal" class="valor-verde">R$ 0,00</span>
                 </div>
             </div>
 
-            <!-- Canvas do Gráfico -->
             <div class="chart-container">
                 <canvas id="graficoEvolucao"></canvas>
             </div>
-        </div>
 
+        </div>
     </div>
 </div>
 
@@ -287,12 +355,25 @@
     let graficoInstancia = null;
     let abaAtiva = 'renda-fixa';
 
+    // ── Tabela regressiva de IR para renda fixa ──────────────────────
+    function calcularAliquotaIR(meses) {
+        if (meses <= 6)  return { aliquota: 0.225, descricao: 'até 180 dias → 22,5%' };
+        if (meses <= 12) return { aliquota: 0.200, descricao: '181 a 360 dias → 20%' };
+        if (meses <= 24) return { aliquota: 0.175, descricao: '361 a 720 dias → 17,5%' };
+        return             { aliquota: 0.150, descricao: 'acima de 720 dias → 15%' };
+    }
+
+    // ── Formata número como moeda BRL ──────────────────────────────
+    function fmt(valor) {
+        return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // ── Troca de aba ───────────────────────────────────────────────
     function mudarAba(idAba) {
         abaAtiva = idAba;
-        
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
         if (idAba === 'renda-fixa') {
             document.getElementById('btn-rf').classList.add('active');
             document.getElementById('renda-fixa').classList.add('active');
@@ -300,7 +381,252 @@
             document.getElementById('btn-rv').classList.add('active');
             document.getElementById('renda-variavel').classList.add('active');
         }
-        
         calcularTudo();
     }
 
+    // ── Cálculo principal ──────────────────────────────────────────
+    function calcularTudo() {
+        const valorInicial  = parseFloat(document.getElementById('valor_inicial').value)  || 0;
+        const aporteMensal  = parseFloat(document.getElementById('aporte_mensal').value)  || 0;
+        const prazoMeses    = parseInt(document.getElementById('prazo_meses').value)       || 1;
+
+        let saldoBruto      = valorInicial;
+        let totalInvestido  = valorInicial;
+        let rendimentoBruto = 0;
+        let isento          = false;
+
+        const evolucaoSaldo     = [valorInicial];
+        const evolucaoInvestido = [valorInicial];
+        const labels            = ['Início'];
+
+        // ── RENDA FIXA ────────────────────────────────────────────
+        if (abaAtiva === 'renda-fixa') {
+            const produto        = document.getElementById('rf_produto').value;
+            const pctCdi         = parseFloat(document.getElementById('rf_rentabilidade').value) / 100;
+            const cdiAnual       = parseFloat(document.getElementById('rf_cdi').value)           / 100;
+            const taxaMensal     = Math.pow(1 + cdiAnual * pctCdi, 1 / 12) - 1;
+
+            isento = (produto === 'lci');
+
+            for (let m = 1; m <= prazoMeses; m++) {
+                saldoBruto     = (saldoBruto + aporteMensal) * (1 + taxaMensal);
+                totalInvestido += aporteMensal;
+
+                evolucaoSaldo.push(saldoBruto);
+                evolucaoInvestido.push(totalInvestido);
+                if (m % Math.max(1, Math.floor(prazoMeses / 12)) === 0 || m === prazoMeses) {
+                    labels.push('Mês ' + m);
+                } else {
+                    labels.push('');
+                }
+            }
+
+            rendimentoBruto = saldoBruto - totalInvestido;
+
+            let ir = 0;
+            let aliquotaInfo = { aliquota: 0, descricao: 'Isento de IR' };
+
+            if (!isento) {
+                aliquotaInfo = calcularAliquotaIR(prazoMeses);
+                ir = rendimentoBruto * aliquotaInfo.aliquota;
+            }
+
+            const finalLiquido = saldoBruto - ir;
+            const rentLiquida  = totalInvestido > 0 ? ((finalLiquido - totalInvestido) / totalInvestido * 100) : 0;
+            const ganhoMensal  = (finalLiquido - totalInvestido) / prazoMeses;
+
+            exibirResultados({
+                totalInvestido, rendimentoBruto,
+                ir, finalLiquido, rentLiquida, ganhoMensal,
+                isento, aliquotaInfo
+            });
+
+        // ── RENDA VARIÁVEL ────────────────────────────────────────
+        } else {
+            const dyAnual         = parseFloat(document.getElementById('rv_dividendos').value)  / 100;
+            const valorizacaoAnual = parseFloat(document.getElementById('rv_valorizacao').value) / 100;
+
+            const dyMensal          = Math.pow(1 + dyAnual, 1 / 12) - 1;
+            const valorizacaoMensal = Math.pow(1 + valorizacaoAnual, 1 / 12) - 1;
+
+            let dividendosAcumulados = 0;
+
+            for (let m = 1; m <= prazoMeses; m++) {
+                saldoBruto += aporteMensal;
+                const dividendos = saldoBruto * dyMensal;
+                dividendosAcumulados += dividendos;
+                saldoBruto = saldoBruto * (1 + valorizacaoMensal) + dividendos;
+                totalInvestido += aporteMensal;
+
+                evolucaoSaldo.push(saldoBruto);
+                evolucaoInvestido.push(totalInvestido);
+                if (m % Math.max(1, Math.floor(prazoMeses / 12)) === 0 || m === prazoMeses) {
+                    labels.push('Mês ' + m);
+                } else {
+                    labels.push('');
+                }
+            }
+
+            rendimentoBruto = saldoBruto - totalInvestido;
+
+            // FIIs: dividendos isentos, mas valorização das cotas tributa 20% para PF
+            const produto = document.getElementById('rv_produto').value;
+            let ir = 0;
+            let aliquotaInfo;
+
+            if (produto === 'acoes') {
+                const ganhoCapital = saldoBruto - totalInvestido - dividendosAcumulados;
+                ir = Math.max(ganhoCapital, 0) * 0.15; // IRPF 15% sobre ganho de capital
+                aliquotaInfo = { descricao: '15% sobre ganho de capital (ações)' };
+            } else {
+                // FIIs: JCP e dividendos isentos PF; projeção simplificada sem IR
+                isento = true;
+                aliquotaInfo = { descricao: 'Dividendos de FIIs isentos de IR para PF' };
+            }
+
+            const finalLiquido = saldoBruto - ir;
+            const rentLiquida  = totalInvestido > 0 ? ((finalLiquido - totalInvestido) / totalInvestido * 100) : 0;
+            const ganhoMensal  = (finalLiquido - totalInvestido) / prazoMeses;
+
+            exibirResultados({
+                totalInvestido, rendimentoBruto,
+                ir, finalLiquido, rentLiquida, ganhoMensal,
+                isento, aliquotaInfo
+            });
+        }
+
+        renderizarGrafico(labels, evolucaoSaldo, evolucaoInvestido, prazoMeses);
+    }
+
+    // ── Atualiza DOM com resultados ────────────────────────────────
+    function exibirResultados({ totalInvestido, rendimentoBruto, ir, finalLiquido, rentLiquida, ganhoMensal, isento, aliquotaInfo }) {
+        document.getElementById('res_total_investido').textContent  = fmt(totalInvestido);
+        document.getElementById('res_rendimento_bruto').textContent = fmt(rendimentoBruto);
+        document.getElementById('res_final_liquido').textContent    = fmt(finalLiquido);
+        document.getElementById('res_rentabilidade_pct').textContent = rentLiquida.toFixed(2).replace('.', ',') + '%';
+        document.getElementById('res_mensal').textContent           = fmt(ganhoMensal);
+
+        const badgeIsento = document.getElementById('badge_isento');
+        const irEl        = document.getElementById('res_ir');
+        const aliqTexto   = document.getElementById('aliquota_texto');
+
+        if (isento) {
+            irEl.textContent        = fmt(0);
+            irEl.className          = 'valor-verde';
+            badgeIsento.style.display = 'inline-block';
+            aliqTexto.textContent   = aliquotaInfo.descricao;
+        } else {
+            irEl.textContent        = '−' + fmt(ir);
+            irEl.className          = 'valor-vermelho';
+            badgeIsento.style.display = 'none';
+            aliqTexto.textContent   = aliquotaInfo.descricao || '';
+        }
+    }
+
+    // ── Gráfico ───────────────────────────────────────────────────
+    function renderizarGrafico(labels, evolucaoSaldo, evolucaoInvestido, prazoMeses) {
+        // Reduz pontos para não sobrecarregar o eixo X
+        const maxPontos = 13;
+        const passo = Math.max(1, Math.floor(prazoMeses / maxPontos));
+
+        const labelsReduzidos   = [];
+        const saldoReduzido     = [];
+        const investidoReduzido = [];
+
+        for (let i = 0; i < labels.length; i += passo) {
+            labelsReduzidos.push(labels[i]);
+            saldoReduzido.push(evolucaoSaldo[i]);
+            investidoReduzido.push(evolucaoInvestido[i]);
+        }
+        // Sempre inclui o último ponto
+        const ult = labels.length - 1;
+        if (labelsReduzidos[labelsReduzidos.length - 1] !== labels[ult]) {
+            labelsReduzidos.push(labels[ult]);
+            saldoReduzido.push(evolucaoSaldo[ult]);
+            investidoReduzido.push(evolucaoInvestido[ult]);
+        }
+
+        const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+
+        if (graficoInstancia) graficoInstancia.destroy();
+
+        graficoInstancia = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labelsReduzidos,
+                datasets: [
+                    {
+                        label: 'Patrimônio Projetado',
+                        data: saldoReduzido,
+                        borderColor: '#ff5a00',
+                        backgroundColor: 'rgba(255, 90, 0, 0.12)',
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#ff5a00',
+                        fill: true,
+                        tension: 0.4,
+                    },
+                    {
+                        label: 'Total Investido',
+                        data: investidoReduzido,
+                        borderColor: '#a3a0a8',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 2,
+                        borderDash: [5, 4],
+                        fill: false,
+                        tension: 0.1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#a3a0a8',
+                            font: { size: 11 },
+                            boxWidth: 14,
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#25222b',
+                        borderColor: '#332f3b',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#a3a0a8',
+                        callbacks: {
+                            label: ctx => ' ' + ctx.dataset.label + ': ' +
+                                ctx.parsed.y.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#a3a0a8',
+                            font: { size: 10 },
+                            maxRotation: 0,
+                        },
+                        grid: { color: 'rgba(255,255,255,0.04)' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#a3a0a8',
+                            font: { size: 10 },
+                            callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)
+                        },
+                        grid: { color: 'rgba(255,255,255,0.06)' }
+                    }
+                }
+            }
+        });
+    }
+
+    // Inicializa ao carregar
+    window.addEventListener('DOMContentLoaded', calcularTudo);
+</script>
+</body>
+</html>
