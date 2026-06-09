@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador Markovich Renda Fixa</title>
-    <!-- Chart.js para o gráfico de evolução -->
-    <script src="https://jsdelivr.net"></script>
+    <title>Simulador Markovich de Renda Fixa</title>
+    <!-- CDN alternativo e estável da Cloudflare para o gráfico -->
+    <script src="https://cloudflare.com"></script>
     <style>
         :root {
             --bg-principal: #1c1921; /* Roxo bem escuro / Grafite Rico */
@@ -290,11 +290,9 @@
     function mudarAba(idAba) {
         abaAtiva = idAba;
         
-        // Remove as classes ativas de todas as abas e botões
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         
-        // Ativa os elementos corretos
         if (idAba === 'renda-fixa') {
             document.getElementById('btn-rf').classList.add('active');
             document.getElementById('renda-fixa').classList.add('active');
@@ -303,3 +301,6 @@
             document.getElementById('renda-variavel').classList.add('active');
         }
         
+        calcularTudo();
+    }
+
