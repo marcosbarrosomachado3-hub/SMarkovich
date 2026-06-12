@@ -28,6 +28,7 @@
     <meta name="twitter:title" content="Simulador Markovich de Renda Fixa">
     <meta name="twitter:description" content="Simule CDB, LCI, Tesouro Selic, FIIs e Ações gratuitamente. Calcule rendimentos líquidos com desconto de IR e gráfico de evolução.">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg-principal: #1c1921;
@@ -252,6 +253,61 @@
             padding-left: 8px;
         }
 
+        /* CDI status */
+        .cdi-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        .cdi-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--cor-mutada);
+            flex-shrink: 0;
+        }
+
+        .cdi-dot.ok   { background: var(--cor-verde); }
+        .cdi-dot.erro { background: var(--cor-vermelha); }
+        .cdi-dot.load { background: #facc15; animation: pisca 1s infinite; }
+
+        @keyframes pisca { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        .cdi-texto { color: var(--cor-mutada); }
+
+        /* Alerta de validação */
+        .alerta-validacao {
+            display: none;
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.4);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--cor-vermelha);
+            margin-top: 10px;
+        }
+
+        /* Botão PDF */
+        .btn-pdf {
+            width: 100%;
+            padding: 11px;
+            background: transparent;
+            border: 1px solid var(--cor-laranja);
+            border-radius: 8px;
+            color: var(--cor-laranja);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .btn-pdf:hover { background: var(--cor-laranja); color: #fff; }
+
         /* Anúncios */
         .ad-topo {
             display: flex;
@@ -326,6 +382,10 @@
                 <div class="form-group">
                     <label for="rf_cdi">Taxa CDI Atual (% ao ano)</label>
                     <input type="number" id="rf_cdi" value="10.50" min="0" max="50" step="0.25" oninput="calcularTudo()">
+                    <div class="cdi-status">
+                        <span class="cdi-dot load" id="cdi_dot"></span>
+                        <span class="cdi-texto" id="cdi_texto">Buscando taxa do Banco Central...</span>
+                    </div>
                 </div>
             </div>
 
@@ -365,6 +425,8 @@
             </div>
 
             <button class="btn-simular" onclick="calcularTudo()">🔄 Recalcular Projeção</button>
+            <div class="alerta-validacao" id="alerta_validacao"></div>
+            <button class="btn-pdf" onclick="exportarPDF()">📄 Exportar Simulação em PDF</button>
         </div>
 
         <!-- RESULTADOS -->
@@ -431,6 +493,202 @@
 <script>
     let graficoInstancia = null;
     let abaAtiva = 'renda-fixa';
+    let ultimoResultado = {}; // armazena dados para o PDF
+
+    // ── Busca CDI via API do Banco Central ────────────────────────
+    async function buscarCDI() {
+        const dot    = document.getElementById('cdi_dot');
+        const texto  = document.getElementById('cdi_texto');
+        dot.className = 'cdi-dot load';
+        texto.textContent = 'Buscando taxa do Banco Central...';
+        try {
+            // Série 4391 = CDI over anualizado (Banco Central do Brasil)
+            const url = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.4391/dados/ultimos/1?formato=json';
+            const res  = await fetch(url);
+            const data = await res.json();
+            if (data && data[0] && data[0].valor) {
+                const taxa = parseFloat(data[0].valor.replace(',', '.'));
+                const data_ref = data[0].data;
+                document.getElementById('rf_cdi').value = taxa.toFixed(2);
+                dot.className = 'cdi-dot ok';
+                texto.textContent = `Taxa do BCB: ${taxa.toFixed(2)}% a.a. (ref. ${data_ref})`;
+                calcularTudo();
+            } else {
+                throw new Error('Sem dados');
+            }
+        } catch(e) {
+            dot.className = 'cdi-dot erro';
+            texto.textContent = 'Não foi possível buscar. Usando valor manual.';
+        }
+    }
+
+    // ── Validação da lógica matemática ────────────────────────────
+    function validarEntradas() {
+        const alerta = document.getElementById('alerta_validacao');
+        const erros  = [];
+
+        const valorInicial = parseFloat(document.getElementById('valor_inicial').value) || 0;
+        const aporteMensal = parseFloat(document.getElementById('aporte_mensal').value) || 0;
+        const prazoMeses   = parseInt(document.getElementById('prazo_meses').value)     || 0;
+
+        if (valorInicial <= 0 && aporteMensal <= 0)
+            erros.push('Informe ao menos um Aporte Inicial ou Aporte Mensal maior que zero.');
+        if (prazoMeses < 1)
+            erros.push('O prazo mínimo é de 1 mês.');
+        if (prazoMeses > 360)
+            erros.push('O prazo máximo é de 360 meses (30 anos).');
+
+        if (abaAtiva === 'renda-fixa') {
+            const cdi  = parseFloat(document.getElementById('rf_cdi').value)           || 0;
+            const pct  = parseFloat(document.getElementById('rf_rentabilidade').value) || 0;
+            if (cdi <= 0)  erros.push('A taxa CDI deve ser maior que zero.');
+            if (pct <= 0)  erros.push('A rentabilidade (% do CDI) deve ser maior que zero.');
+            if (pct > 200) erros.push('Rentabilidade acima de 200% do CDI é improvável — verifique o valor.');
+        } else {
+            const dy  = parseFloat(document.getElementById('rv_dividendos').value)  || 0;
+            const val = parseFloat(document.getElementById('rv_valorizacao').value);
+            if (dy < 0)   erros.push('O Dividend Yield não pode ser negativo.');
+            if (dy > 50)  erros.push('Dividend Yield acima de 50% a.a. é improvável — verifique o valor.');
+            if (val < -50) erros.push('Valorização abaixo de -50% a.a. é improvável — verifique o valor.');
+        }
+
+        if (erros.length > 0) {
+            alerta.style.display = 'block';
+            alerta.innerHTML = '⚠️ ' + erros.join('<br>⚠️ ');
+            return false;
+        } else {
+            alerta.style.display = 'none';
+            return true;
+        }
+    }
+
+    // ── Exportar PDF ──────────────────────────────────────────────
+    function exportarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+        const laranja = [255, 90, 0];
+        const cinza   = [100, 100, 110];
+        const branco  = [255, 255, 255];
+        const escuro  = [28, 25, 33];
+
+        // Fundo
+        doc.setFillColor(...escuro);
+        doc.rect(0, 0, 210, 297, 'F');
+
+        // Cabeçalho
+        doc.setFillColor(...laranja);
+        doc.rect(0, 0, 210, 22, 'F');
+        doc.setTextColor(...branco);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Simulador Markovich — Relatório de Simulação', 105, 14, { align: 'center' });
+
+        // Data
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...cinza);
+        doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 105, 29, { align: 'center' });
+
+        // Tipo de simulação
+        const tipo = abaAtiva === 'renda-fixa' ? '📊 Renda Fixa' : '📈 Renda Variável';
+        doc.setFontSize(11);
+        doc.setTextColor(...laranja);
+        doc.setFont('helvetica', 'bold');
+        doc.text(tipo, 15, 38);
+
+        // Linha separadora
+        doc.setDrawColor(...laranja);
+        doc.setLineWidth(0.4);
+        doc.line(15, 41, 195, 41);
+
+        // Parâmetros da simulação
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...cinza);
+        doc.text('PARÂMETROS', 15, 49);
+
+        const params = [];
+        if (abaAtiva === 'renda-fixa') {
+            const produtos = { cdb: 'CDB (Pós-Fixado)', lci: 'LCI / LCA', tesouro: 'Tesouro Selic' };
+            params.push(['Produto', produtos[document.getElementById('rf_produto').value]]);
+            params.push(['Rentabilidade', document.getElementById('rf_rentabilidade').value + '% do CDI']);
+            params.push(['Taxa CDI', document.getElementById('rf_cdi').value + '% a.a.']);
+        } else {
+            const ativos = { fii: 'Fundos Imobiliários (FIIs)', acoes: 'Ações' };
+            params.push(['Ativo', ativos[document.getElementById('rv_produto').value]]);
+            params.push(['Dividend Yield', document.getElementById('rv_dividendos').value + '% a.a.']);
+            params.push(['Valorização', document.getElementById('rv_valorizacao').value + '% a.a.']);
+        }
+        params.push(['Aporte Inicial', fmt(parseFloat(document.getElementById('valor_inicial').value) || 0)]);
+        params.push(['Aporte Mensal', fmt(parseFloat(document.getElementById('aporte_mensal').value) || 0)]);
+        params.push(['Prazo', document.getElementById('prazo_meses').value + ' meses']);
+
+        let y = 56;
+        params.forEach(([chave, valor]) => {
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cinza);
+            doc.text(chave + ':', 15, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...branco);
+            doc.text(valor, 75, y);
+            y += 7;
+        });
+
+        // Linha separadora
+        y += 2;
+        doc.line(15, y, 195, y);
+        y += 8;
+
+        // Resultados
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...cinza);
+        doc.text('RESULTADOS', 15, y);
+        y += 7;
+
+        const resultados = [
+            ['Total Investido',         document.getElementById('res_total_investido').textContent,  branco],
+            ['Rendimento Bruto',        document.getElementById('res_rendimento_bruto').textContent, [52, 211, 153]],
+            ['IR Projetado',            document.getElementById('res_ir').textContent,               [248, 113, 113]],
+            ['Valor Final Líquido',     document.getElementById('res_final_liquido').textContent,    laranja],
+            ['Rentabilidade Líquida',   document.getElementById('res_rentabilidade_pct').textContent,[52, 211, 153]],
+            ['Retorno Mensal Médio',    document.getElementById('res_mensal').textContent,           [52, 211, 153]],
+        ];
+
+        resultados.forEach(([chave, valor, cor]) => {
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cinza);
+            doc.text(chave + ':', 15, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...cor);
+            doc.text(valor, 75, y);
+            y += 7;
+        });
+
+        // Gráfico
+        y += 4;
+        doc.line(15, y, 195, y);
+        y += 8;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...cinza);
+        doc.setFontSize(9);
+        doc.text('GRÁFICO DE EVOLUÇÃO PATRIMONIAL', 15, y);
+        y += 4;
+
+        const canvas = document.getElementById('graficoEvolucao');
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 15, y, 180, 70);
+
+        // Rodapé
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...cinza);
+        doc.text('Simulador Markovich — marcosbarrosomachado3-hub.github.io/SMarkovich', 105, 290, { align: 'center' });
+        doc.text('Este relatório é uma projeção estimada e não constitui recomendação de investimento.', 105, 294, { align: 'center' });
+
+        doc.save('simulacao-markovich.pdf');
+    }
 
     // ── Tabela regressiva de IR para renda fixa ──────────────────────
     function calcularAliquotaIR(meses) {
@@ -463,6 +721,7 @@
 
     // ── Cálculo principal ──────────────────────────────────────────
     function calcularTudo() {
+        if (!validarEntradas()) return;
         const valorInicial  = parseFloat(document.getElementById('valor_inicial').value)  || 0;
         const aporteMensal  = parseFloat(document.getElementById('aporte_mensal').value)  || 0;
         const prazoMeses    = parseInt(document.getElementById('prazo_meses').value)       || 1;
@@ -703,7 +962,10 @@
     }
 
     // Inicializa ao carregar
-    window.addEventListener('DOMContentLoaded', calcularTudo);
+    window.addEventListener('DOMContentLoaded', () => {
+        buscarCDI();
+        calcularTudo();
+    });
 </script>
 </body>
 </html>
